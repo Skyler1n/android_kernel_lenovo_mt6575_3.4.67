@@ -279,6 +279,15 @@ static DISP_STATUS dsi_init(UINT32 fbVA, UINT32 fbPA, BOOL isLcmInited)
 	if (!disp_drv_dsi_init_context()) 
 		return DISP_STATUS_NOT_IMPLEMENTED;
 
+#ifndef BUILD_UBOOT
+	/* Rebuild the A690 display state after the legacy bootloader handoff. */
+	if (lcm_drv && !strcmp(lcm_drv->name, "otm8009a_dsi_6575")) {
+		printk(KERN_INFO "[A690] stock OTM8009A full init (bootloader=%d)\n",
+		       isLcmInited);
+		isLcmInited = FALSE;
+	}
+#endif
+
 	if(lcm_params->dsi.mode == CMD_MODE) {
 	
 		init_lcd();
