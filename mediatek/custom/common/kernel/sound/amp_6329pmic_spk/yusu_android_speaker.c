@@ -26,6 +26,15 @@
 #include <mach/mt_typedefs.h>
 #include <mach/mt_clock_manager.h>
 #include <mach/mt_pmic_feature_api.h>
+#include <board-custom.h>
+
+/* Boards without an external amplifier retain the original PMIC-only path. */
+#ifndef CUST_SPEAKER_TURNON
+#define CUST_SPEAKER_TURNON() do {} while (0)
+#endif
+#ifndef CUST_SPEAKER_TURNOFF
+#define CUST_SPEAKER_TURNOFF() do {} while (0)
+#endif
 
 /*****************************************************************************
 *                C O M P I L E R      F L A G S
@@ -219,6 +228,7 @@ void Sound_Speaker_Turnon(int channel)
 #elif defined(AMP_CLASS_D)
     hwSPKClassDTurnOn(SPK_L_ENABLE,SPK_R_ENABLE);
 #endif
+    CUST_SPEAKER_TURNON();
     msleep(SPK_WARM_UP_TIME);
     gsk_on = true;
 }
@@ -236,6 +246,7 @@ void Sound_Speaker_Turnoff(int channel)
     headset_switch_on();
 #endif
 //>2014/06/20-Yuting Shih-[BU2SC00145520].
+    CUST_SPEAKER_TURNOFF();
 #if defined(AMP_CLASS_AB)
     hwSPKClassABTurnOff();
 #elif defined(AMP_CLASS_D)

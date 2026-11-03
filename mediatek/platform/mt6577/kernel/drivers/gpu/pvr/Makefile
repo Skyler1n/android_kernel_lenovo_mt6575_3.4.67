@@ -41,6 +41,12 @@ endif
 endif
 endif
 
+# A690 uses the XT916 production KK graphics libraries. MTK_DEBUG changes
+# sizeof(PVRSRV_BRIDGE_PACKAGE) from 28 to 540 and therefore the ioctl IDs.
+ifeq ($(TARGET_PRODUCT),lcsh75_cu_gb2)
+VER:=user
+endif
+
 ccflags-y += \
 	-include $(MTK_PATH_PLATFORM)/drivers/gpu/pvr/include4/config_kernel_$(VER).h
 
@@ -58,7 +64,6 @@ pvrsrvkm-y := \
 	services4/srvkm/env/linux/mutex.o \
 	services4/srvkm/env/linux/event.o \
 	services4/srvkm/env/linux/osperproc.o \
-	services4/srvkm/env/linux/systrace.o \
 	services4/srvkm/common/buffer_manager.o \
 	services4/srvkm/common/devicemem.o \
 	services4/srvkm/common/deviceclass.o \

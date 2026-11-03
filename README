@@ -1,0 +1,7 @@
+export PATH=~/Your_Toolchain_PATH/
+for example /alps/prebuilt/linux-x86/toolchain/arm-eabi-4.7/bin
+Build Command:
+kernel
+======
+cd kernel directory
+TARGET_PRODUCT=lcsh75_cu_gb2 MTK_ROOT_CUSTOM=../mediatek/custom/ CROSS_COMPILE=arm-eabi- make -j8

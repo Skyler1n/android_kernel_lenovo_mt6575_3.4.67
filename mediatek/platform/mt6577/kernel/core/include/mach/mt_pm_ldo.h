@@ -50,7 +50,8 @@ typedef enum MT65XX_POWER_VOL_TAG
     VOL_DEFAULT, 
 	VOL_1200 = 1200,	
     VOL_1300 = 1300,    
-    VOL_1500 = 1500,    
+    VOL_1500 = 1500,
+    VOL_1540 = 1540, /* A690 HI351 original VCAMD calibration */
     VOL_1800 = 1800,    
     VOL_2000 = 2000,
     VOL_2100 = 2100,

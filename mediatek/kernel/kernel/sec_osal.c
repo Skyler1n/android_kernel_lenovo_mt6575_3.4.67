@@ -174,37 +174,37 @@ void osal_restore_fs (void)
 
 int osal_filp_open_read_only(const char *file_path)
 {
-    int filp_id = 0;
-    int val = 0;
-    
-    val = down_interruptible(&osal_fp_sem);
+    int filp_id;
+    struct file *file;
+    mm_segment_t old_fs;
 
-    for(filp_id=1 ; filp_id<OSAL_MAX_FP_COUNT; filp_id++)
-    {
-        if(g_osal_fp[filp_id] == NULL)
-        {
+    if (down_interruptible(&osal_fp_sem))
+        return OSAL_FILE_NULL;
+
+    for (filp_id = 1; filp_id < OSAL_MAX_FP_COUNT; filp_id++)
+        if (!g_osal_fp[filp_id])
             break;
-        }
-    }
-    
-    g_osal_fp[filp_id] = filp_open(file_path, O_RDONLY, 0777);
 
-    if(IS_ERR(g_osal_fp[filp_id]))
-    {
-        g_osal_fp[OSAL_FILE_NULL] = g_osal_fp[filp_id]; //Record the fail reason in pos 0
-        g_osal_fp[filp_id] = NULL;
-        filp_id = OSAL_FILE_NULL;
-    }
-
-    up(&osal_fp_sem);
-    
-    /* the fp_id = 0 will be thought as NULL file ponter */
-    if(filp_id >= OSAL_FP_OVERFLOW ) 
-    {
-        g_osal_fp[OSAL_FILE_NULL] = (struct file *)(-ENOMEM);//Out of memory
+    /* Check before indexing the table: the old code wrote one past its end. */
+    if (filp_id == OSAL_MAX_FP_COUNT) {
+        g_osal_fp[OSAL_FILE_NULL] = ERR_PTR(-ENOMEM);
+        up(&osal_fp_sem);
         return OSAL_FILE_NULL;
     }
-    
+
+    /* This API accepts a kernel pathname, including calls from user tasks. */
+    old_fs = get_fs();
+    set_fs(KERNEL_DS);
+    file = filp_open(file_path, O_RDONLY, 0);
+    set_fs(old_fs);
+    if (IS_ERR(file)) {
+        pr_err("[sec_osal] open %s failed: %ld\n", file_path, PTR_ERR(file));
+        g_osal_fp[OSAL_FILE_NULL] = file;
+        up(&osal_fp_sem);
+        return OSAL_FILE_NULL;
+    }
+    g_osal_fp[filp_id] = file;
+    up(&osal_fp_sem);
     return filp_id;
 }
 
@@ -329,21 +329,15 @@ long osal_filp_read(int fp_id, char *buf, unsigned long len)
 long osal_is_err(int fp_id)
 {
     bool err;
-    int val = 0;
-    
-    if(fp_id >= 1 && fp_id < OSAL_MAX_FP_COUNT)
-    {
-        val = down_interruptible(&osal_fp_sem);
 
-        err = IS_ERR(g_osal_fp[fp_id]);
-            
-        up(&osal_fp_sem);
-        
-        return err;
-    }    
-    
-    osal_assert(0);   
-    return 1;
+    /* Open failure is represented by handle zero; it is not a kernel BUG. */
+    if (fp_id < 1 || fp_id >= OSAL_MAX_FP_COUNT)
+        return 1;
+    if (down_interruptible(&osal_fp_sem))
+        return 1;
+    err = IS_ERR_OR_NULL(g_osal_fp[fp_id]);
+    up(&osal_fp_sem);
+    return err;
 }
 
 EXPORT_SYMBOL(osal_kfree);

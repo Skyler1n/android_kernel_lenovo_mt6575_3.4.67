@@ -1,3 +1,12 @@
+# A690 standalone entry for the same TARGET_PRODUCT interface as Lenovo GPL trees.
+ifeq ($(TARGET_PRODUCT),lcsh75_cu_gb2)
+ifeq ($(A690_MAKE_READY),)
+a690_bootstrap := yes
+endif
+endif
+ifeq ($(a690_bootstrap),yes)
+include ../mediatek/build/kernel/a690.mk
+else
 VERSION = 3
 PATCHLEVEL = 4
 SUBLEVEL = 67
@@ -1617,3 +1626,5 @@ FORCE:
 # Declare the contents of the .PHONY variable as phony.  We keep that
 # information in a variable so we can use it in if_changed and friends.
 .PHONY: $(PHONY)
+
+endif # A690 standalone entry

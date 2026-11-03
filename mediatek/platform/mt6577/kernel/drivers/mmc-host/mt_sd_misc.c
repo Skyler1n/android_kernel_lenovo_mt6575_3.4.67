@@ -735,6 +735,7 @@ int msdc_get_info(STORAGE_TPYE storage_type,GET_STORAGE_INFO info_type,struct st
 				return 0;
 			}
 			break;
+#ifdef MTK_EMMC_SUPPORT
 		case EMMC_USER_CAPACITY :
 			info->emmc_user_capacity = msdc_get_capacity(0);
 			break;
@@ -744,6 +745,12 @@ int msdc_get_info(STORAGE_TPYE storage_type,GET_STORAGE_INFO info_type,struct st
 		case EMMC_RESERVE:
 			info->emmc_reserve = msdc_get_reserve();
 			break;
+#else
+        case EMMC_USER_CAPACITY:
+        case EMMC_CAPACITY:
+        case EMMC_RESERVE:
+            return 0; /* eMMC information is unavailable on NAND boards. */
+#endif
 		default :
 			printk(KERN_ERR "Please check INFO_TYPE");
 			return 0;
@@ -753,6 +760,10 @@ int msdc_get_info(STORAGE_TPYE storage_type,GET_STORAGE_INFO info_type,struct st
 
 static int simple_mmc_get_disk_info(struct mbr_part_info* mpi, unsigned char* name)
 {
+#ifndef MTK_EMMC_SUPPORT
+    /* Internal storage is NAND; no eMMC partition can be returned. */
+    return 1;
+#else
     int i = 0;
     char* no_partition_name = "n/a";
     struct disk_part_iter piter;
@@ -803,6 +814,7 @@ static int simple_mmc_get_disk_info(struct mbr_part_info* mpi, unsigned char* na
     disk_part_iter_exit(&piter);
 
     return 1;
+#endif
 }
 
 

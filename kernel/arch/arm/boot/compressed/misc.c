@@ -152,3 +152,48 @@ decompress_kernel(unsigned long output_start, unsigned long free_mem_ptr_p,
 	else
 		putstr(" done, booting the kernel.\n");
 }
+
+/* Called before GOT/BSS setup. Keep this routine freestanding: no globals,
+ * no allocation, no library calls. Restrict to the old A690 U-Boot address.
+ * 64MiB is inside the captured A690 ATAG_MEM range and well above the
+ * current kernel's end (0x025e5ac0). The bootloader already loaded initrd
+ * here before the kernel; moving it later in arm_memblock_init is too late.
+ */
+void a690_relocate_legacy_initrd(unsigned int *tags)
+{
+    unsigned int remaining = 4096;
+    unsigned int n, start, size, i;
+    volatile unsigned char *src, *dst;
+
+    if ((unsigned int)tags < 0x01600000 ||
+        (unsigned int)tags >= 0x20000000 || ((unsigned int)tags & 3))
+        return;
+    if (tags[1] != 0x54410001) /* ATAG_CORE */
+        return;
+
+    while (remaining >= 2) {
+        n = tags[0];
+        if (n < 2 || n > remaining)
+            return;
+        if ((tags[1] == 0x54420005 || tags[1] == 0x54410005) && n >= 4) {
+            start = tags[2];
+            size = tags[3];
+            if (tags[1] == 0x54410005) {
+                if (start < 0xc0000000)
+                    return;
+                start = start - 0xc0000000 + 0x01600000;
+            }
+            if (start != 0x02300000 || !size || size > 0x00800000)
+                return;
+            src = (volatile unsigned char *)start;
+            dst = (volatile unsigned char *)0x04000000;
+            for (i = 0; i < size; i++)
+                dst[i] = src[i];
+            tags[2] = 0x04000000;
+            tags[1] = 0x54420005; /* physical ATAG_INITRD2 */
+            return;
+        }
+        tags += n;
+        remaining -= n;
+    }
+}

@@ -397,6 +397,7 @@ struct nand_ecclayout {
 #define DBG_EVT_BADBLOCK	0x00000040	/* Badblock related event */
 #define DBG_EVT_POWERCTL	0x00000080	/* Suspend/Resume related event */
 
+#define DBG_EVT_OTP              0x00000100  /* OTP ioctl diagnostics */
 #define DBG_EVT_ALL			0xffffffff
 
 #define DBG_EVT_MASK      	(DBG_EVT_INIT)

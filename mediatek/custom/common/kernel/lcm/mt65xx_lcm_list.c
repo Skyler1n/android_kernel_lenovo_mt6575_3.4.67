@@ -185,8 +185,12 @@ extern LCM_DRIVER otm8009a_dsi_vdo_lcm_drv;
 extern LCM_DRIVER otm8018b_vdo_spi_lcm_drv;
 #endif
 
+extern LCM_DRIVER otm8009a_dsi_6575_lcm_drv;
 LCM_DRIVER* lcm_driver_list[] = 
-{ 
+{
+#if defined(OTM8009A_DSI_6575)
+    &otm8009a_dsi_6575_lcm_drv,
+#endif
 #if defined(OTM8018B_DSI_VDO_TXD_FWVGA)
 	&otm8018b_dsi_vdo_txd_fwvga_lcm_drv,
 #endif
@@ -539,7 +543,7 @@ LCM_DRIVER* lcm_driver_list[] =
 
 #if defined(HX8392A_DSI_CMD)
   &hx8392a_dsi_cmd_lcm_drv,
-#endif 
+#endif
 
 #if defined(NT35516_QHD_DSI_CMD_IPSBOE)
   &nt35516_qhd_dsi_cmd_ipsboe_lcm_drv,

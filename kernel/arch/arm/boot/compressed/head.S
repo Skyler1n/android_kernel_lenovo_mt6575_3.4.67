@@ -217,6 +217,18 @@ restart:	adr	r0, LC0
 		mov	r10, r6
 #endif
 
+        /* A690's old U-Boot puts initrd at 0x02300000, inside the
+         * larger 3.4 kernel's BSS/relocation range. Move it before any
+         * compressed-image self relocation or output/BSS overwrite.
+         * Like atags_to_fdt below, this helper uses no globals or GOT.
+         */
+        add     sp, sp, #0x10000
+        stmfd   sp!, {r0-r3, ip, lr}
+        mov     r0, r8
+        bl      a690_relocate_legacy_initrd
+        ldmfd   sp!, {r0-r3, ip, lr}
+        sub     sp, sp, #0x10000
+
 		mov	r5, #0			@ init dtb size to 0
 #ifdef CONFIG_ARM_APPENDED_DTB
 /*

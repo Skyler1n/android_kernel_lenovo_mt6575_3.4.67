@@ -707,7 +707,7 @@ PVRSRV_ERROR SGXInitialise(PVRSRV_SGXDEV_INFO	*psDevInfo,
 	{
 		PVR_DPF((PVR_DBG_ERROR, "SGXInitialise: Wait for uKernel initialisation failed"));
 
-		SGXDumpDebugInfo(psDevInfo, IMG_FALSE);
+		SGXDumpDebugInfo(psDevInfo, IMG_TRUE);
 		PVR_DBG_BREAK;
 
 		return PVRSRV_ERROR_RETRY;
@@ -1772,11 +1772,19 @@ IMG_VOID HWRecoveryResetSGX (PVRSRV_DEVICE_NODE *psDeviceNode,
 	/* Suspend pdumping. */
 	PDUMPSUSPEND();
 
+	{
+		int counter = 0;
 	/* Reset and re-initialise SGX. */
+		do
+		{
 	eError = SGXInitialise(psDevInfo, IMG_TRUE);
 	if (eError != PVRSRV_OK)
 	{
-		PVR_DPF((PVR_DBG_ERROR,"HWRecoveryResetSGX: SGXInitialise failed (%d)", eError));
+				PVR_DPF((PVR_DBG_ERROR,"HWRecoveryResetSGX: SGXInitialise failed (%d) counter (%d)", eError, counter));
+			}
+			counter ++;
+		}
+		while (eError==PVRSRV_ERROR_RETRY);
 	}
 
 	/* Resume pdumping. */

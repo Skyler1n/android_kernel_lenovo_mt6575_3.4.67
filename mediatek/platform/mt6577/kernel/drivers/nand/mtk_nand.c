@@ -21,6 +21,7 @@
 #include <linux/types.h>
 #include <linux/wait.h>
 #include <linux/spinlock.h>
+#include <linux/mutex.h>
 #include <linux/interrupt.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/nand.h>
@@ -78,7 +79,7 @@ extern void mt_irq_set_polarity(unsigned int irq,unsigned int polarity);
 static const unsigned int Samsung_OTP_Page[SAMSUNG_OTP_PAGE_NUM] = { 0x15, 0x16, 0x17, 0x18, 0x19, 0x1b };
 
 static struct mtk_otp_config g_mtk_otp_fuc;
-static spinlock_t g_OTPLock;
+static struct mutex g_OTPLock;
 
 #define OTP_MAGIC           'k'
 
@@ -391,6 +392,24 @@ bool get_device_info(u8*id, flashdev_info *devinfo)
     u32 i,m,n,mismatch;
     int target=-1;
     u8 target_id_len=0;
+    /* A690 production ID is EC BC 00 6A 56 (also logged by the working
+     * CWM kernel).  The NANDGEN workbook only contains the 66 variant.
+     * Use the known-working MT6575 16-bit, 4K/256K, ECC4 + 16-byte-per-
+     * sector NFI format.  Legacy MTD reports 64 OOB bytes for this ID,
+     * but the controller transfers 128 physical spare bytes per page.
+     * Do not apply the legacy driver's manufacturer/device-only fallback.
+     */
+    static const flashdev_info a690_nand = {
+        {0xec, 0xbc, 0x00, 0x6a, 0x56}, 5, 5, 16,
+        512, 256, 4096, 128, 0x21044333, "A690-ECBC6A56", RAMDOM_READ
+    };
+
+    if (!memcmp(id, a690_nand.id, a690_nand.id_length)) {
+        *devinfo = a690_nand;
+        printk(KERN_INFO "[NAND] A690 exact ID EC BC 00 6A 56: "
+               "16-bit 4K page 128 spare ECC4 256K erase 512MiB\n");
+        return true;
+    }
     for (i = 0; i<CHIP_CNT; i++){
 		mismatch=0;
 		for(m=0;m<gen_FlashTable[i].id_length;m++){		
@@ -412,7 +431,7 @@ bool get_device_info(u8*id, flashdev_info *devinfo)
 			MSG(INIT, "%x ",devinfo->id[n]);
 		}
 		MSG(INIT, "], Device Name [%s], Page Size [%d]B Spare Size [%d]B Total Size [%d]MB\n",gen_FlashTable[target].devciename,gen_FlashTable[target].pagesize,gen_FlashTable[target].sparesize,gen_FlashTable[target].totalsize);
-		devinfo->id_length=gen_FlashTable[i].id_length;
+		devinfo->id_length=gen_FlashTable[target].id_length;
 		devinfo->blocksize = gen_FlashTable[target].blocksize;
 		devinfo->addr_cycle = gen_FlashTable[target].addr_cycle;
 		devinfo->iowidth = gen_FlashTable[target].iowidth;
@@ -3504,10 +3523,17 @@ static int mtk_nand_probe(struct platform_device *pdev)
     manu_id = id[0];
     dev_id = id[1];
 
+    printk(KERN_INFO "[NAND] READID %02x %02x %02x %02x %02x\n",
+           id[0], id[1], id[2], id[3], id[4]);
     if (!get_device_info(id,&devinfo))
     {
-        MSG(INIT, "Not Support this Device! \r\n");
+        printk(KERN_ERR "[NAND] Unsupported ID; refusing unconfigured scan\n");
+        err = -ENODEV;
+        goto out_unscanned;
     }
+    printk(KERN_INFO "[NAND] bus=%u page=%u spare=%u erase=%uK timing=%08x\n",
+           devinfo.iowidth, devinfo.pagesize, devinfo.sparesize,
+           devinfo.blocksize, devinfo.timmingsetting);
 
     if (devinfo.pagesize == 4096)
     {
@@ -3538,8 +3564,8 @@ static int mtk_nand_probe(struct platform_device *pdev)
         MSG(INIT, "%s : Set the 16-bit I/O settings!\n", MODULE_NAME);
         nand_chip->options |= NAND_BUSWIDTH_16;
     }
-    mt_irq_set_sens(MT_NFI_IRQ_ID, MT65xx_EDGE_SENSITIVE);
-    mt_irq_set_polarity(MT_NFI_IRQ_ID, MT65xx_POLARITY_LOW);
+    mt_irq_set_sens(MT_NFI_IRQ_ID, MT_LEVEL_SENSITIVE);
+    mt_irq_set_polarity(MT_NFI_IRQ_ID, MT_POLARITY_LOW);
     err = request_irq(MT_NFI_IRQ_ID, mtk_nand_irq_handler, IRQF_DISABLED, "mt6577-nand", NULL);
 
 	if (0 != err)
@@ -3622,6 +3648,7 @@ static int mtk_nand_probe(struct platform_device *pdev)
   out:
     MSG(INIT, "[NFI] mt6577_nand_probe fail, err = %d!\n", err);
     nand_release(mtd);
+  out_unscanned:
     platform_set_drvdata(pdev, NULL);
     kfree(host);
     nand_disable_clock();
@@ -4032,13 +4059,18 @@ static int mt_otp_access(unsigned int access_type, unsigned int offset, void *bu
 static long mt_otp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
     int ret = 0, i = 0;
-    static char *pbuf = NULL;
+    char *pbuf = NULL;
+    unsigned int limit;
 
     void __user *uarg = (void __user *)arg;
     struct otp_ctl otpctl;
 
-    /* Lock */
-    spin_lock(&g_OTPLock);
+#ifdef A690_NAND_OTP_READONLY
+    if (cmd == OTP_WRITE)
+        return -EROFS;
+#endif
+    /* User copies, allocations and NAND transactions can sleep. */
+    mutex_lock(&g_OTPLock);
 
     if (copy_from_user(&otpctl, uarg, sizeof(struct otp_ctl)))
     {
@@ -4053,10 +4085,18 @@ static long mt_otp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
         goto exit;
     }
 
-    if (!(pbuf = kmalloc(sizeof(char) * otpctl.Length, GFP_KERNEL)))
-    {
-        ret = -ENOMEM;
-        goto exit;
+    if (cmd != OTP_GET_LENGTH) {
+        g_mtk_otp_fuc.OTPQueryLength(&limit);
+        if (!otpctl.Length || otpctl.Length > limit ||
+            otpctl.Offset > limit - otpctl.Length) {
+            ret = -EINVAL;
+            goto exit;
+        }
+        pbuf = kmalloc(otpctl.Length, GFP_KERNEL);
+        if (!pbuf) {
+            ret = -ENOMEM;
+            goto exit;
+        }
     }
 
     switch (cmd)
@@ -4076,6 +4116,7 @@ static long mt_otp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
           if (copy_to_user(otpctl.BufferPtr, pbuf, (sizeof(char) * otpctl.Length)))
           {
               MSG(OTP, "OTP IOCTL: Copy to user buffer Error !\n");
+              ret = -EFAULT;
               goto error;
           }
           break;
@@ -4084,6 +4125,7 @@ static long mt_otp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
           if (copy_from_user(pbuf, otpctl.BufferPtr, (sizeof(char) * otpctl.Length)))
           {
               MSG(OTP, "OTP IOCTL: Copy from user buffer Error !\n");
+              ret = -EFAULT;
               goto error;
           }
           mt_otp_access(FS_OTP_WRITE, otpctl.Offset, pbuf, otpctl.Length, &otpctl.status);
@@ -4097,7 +4139,7 @@ static long mt_otp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
   error:
     kfree(pbuf);
   exit:
-    spin_unlock(&g_OTPLock);
+    mutex_unlock(&g_OTPLock);
     return ret;
 }
 
@@ -4159,7 +4201,7 @@ static int __init mtk_nand_init(void)
         MSG(OTP, "OTP: failed to register NAND OTP device!\n");
         return err;
     }
-    spin_lock_init(&g_OTPLock);
+    mutex_init(&g_OTPLock);
 #endif
 
 #if (NAND_OTP_SUPPORT && SAMSUNG_OTP_SUPPORT)

@@ -1,0 +1,86 @@
+#ifndef __PARTITION_DEFINE_H__
+#define __PARTITION_DEFINE_H__
+#define KB 1024
+#define MB (1024*KB)
+#define GB (1024*MB)
+#define PART_NUM 15
+#define PART_MAX_COUNT 40
+#define PART_SIZE_BMTPOOL 80
+#define WRITE_SIZE_Byte 4096
+#define MBR_START_ADDRESS_BYTE 0
+#define PART_FLAG_NONE 0
+#define PART_FLAG_LEFT 1
+#define PART_FLAG_END 2
+#define PART_MAGIC 0x58881688
+#define PART_PRELOADER "PRELOADER"
+#define PART_SIZE_PRELOADER 0x80000
+#define PART_OFFSET_PRELOADER 0x0
+#define PART_DSP_BL "DSP_BL"
+#define PART_SIZE_DSP_BL 0x180000
+#define PART_OFFSET_DSP_BL 0x80000
+#define PART_NVRAM "NVRAM"
+#define PART_SIZE_NVRAM 0x300000
+#define PART_OFFSET_NVRAM 0x200000
+#define PART_SECCFG "SECCFG"
+#define PART_SIZE_SECCFG 0x40000
+#define PART_OFFSET_SECCFG 0x500000
+#define PART_UBOOT "UBOOT"
+#define PART_SIZE_UBOOT 0x80000
+#define PART_OFFSET_UBOOT 0x540000
+#define PART_BOOTIMG "BOOTIMG"
+#define PART_SIZE_BOOTIMG 0x500000
+#define PART_OFFSET_BOOTIMG 0x5c0000
+#define PART_RECOVERY "RECOVERY"
+#define PART_SIZE_RECOVERY 0x500000
+#define PART_OFFSET_RECOVERY 0xac0000
+#define PART_SEC_RO "SEC_RO"
+#define PART_SIZE_SEC_RO 0x100000
+#define PART_OFFSET_SEC_RO 0xfc0000
+#define PART_MISC "MISC"
+#define PART_SIZE_MISC 0x80000
+#define PART_OFFSET_MISC 0x10c0000
+#define PART_LOGO "LOGO"
+#define PART_SIZE_LOGO 0x200000
+#define PART_OFFSET_LOGO 0x1140000
+#define PART_EXPDB "EXPDB"
+#define PART_SIZE_EXPDB 0xc0000
+#define PART_OFFSET_EXPDB 0x1340000
+#define PART_FAT "FAT"
+#define PART_SIZE_FAT 0x500000
+#define PART_OFFSET_FAT 0x1400000
+#define PART_ANDROID "ANDROID"
+#define PART_SIZE_ANDROID 0xa780000
+#define PART_OFFSET_ANDROID 0x1900000
+#define PART_CACHE "CACHE"
+#define PART_SIZE_CACHE 0x400000
+#define PART_OFFSET_CACHE 0xc080000
+#define PART_USRDATA "USRDATA"
+#define PART_SIZE_USRDATA 0x12700000
+#define PART_OFFSET_USRDATA 0xc480000
+typedef enum  {
+	EMMC = 1,
+	NAND = 2,
+} dev_type;
+
+typedef enum {
+	USER = 0,
+	BOOT_1,
+	BOOT_2,
+	RPMB,
+	GP_1,
+	GP_2,
+	GP_3,
+	GP_4,
+} Region;
+
+
+struct excel_info{
+	char * name;
+	unsigned long long size;
+	unsigned long long start_address;
+	dev_type type ;
+	unsigned int partition_idx;
+	Region region;
+};
+extern struct excel_info *PartInfo;
+#endif

@@ -16,7 +16,9 @@ obj-y += masp/
 obj-y += mau/ 
 obj-y += mmc-host/  
 obj-y += nand/
+ifeq ($(MTK_EMMC_SUPPORT),yes)
 obj-y += pmt/
+endif
 obj-y += power/
 obj-y += power-loss-test/
 obj-y += rtc/ 

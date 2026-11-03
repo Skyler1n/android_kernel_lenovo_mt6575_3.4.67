@@ -88,6 +88,10 @@ static wait_queue_head_t gWmtInitWq;
 
 P_WMT_PATCH_INFO pPatchInfo = NULL;
 UINT32 pAtchNum = 0;
+/* Launcher patch ABI uses 1-based sequences; bound before pointer arithmetic. */
+#define WMT_MAX_PATCH_COUNT 16
+static UINT32 patchInfoReceived;
+static UINT32 patchInfoSeen;
 
 
 /*******************************************************************************
@@ -1080,6 +1084,18 @@ WMT_unlocked_ioctl (
 		break;
 		
         case WMT_IOCTL_SET_PATCH_NUM: {
+            if (!arg || arg > WMT_MAX_PATCH_COUNT) {
+                WMT_ERR_FUNC("A690 reject invalid patch count %lu\n", arg);
+                iRet = -EINVAL;
+                break;
+            }
+            if (pPatchInfo) {
+                WMT_ERR_FUNC("A690 patch table is still active\n");
+                iRet = -EBUSY;
+                break;
+            }
+            patchInfoReceived = 0;
+            patchInfoSeen = 0;
 			pAtchNum = arg;
 			WMT_INFO_FUNC(" get patch num from launcher = %d\n",pAtchNum);
 			wmt_lib_set_patch_num(pAtchNum);
@@ -1095,7 +1111,7 @@ WMT_unlocked_ioctl (
 			WMT_PATCH_INFO wMtPatchInfo;
 			P_WMT_PATCH_INFO pTemp = NULL;
 			UINT32 dWloadSeq;
-			static UINT32 counter = 0;
+
 			
 			if (!pPatchInfo) {
 				WMT_ERR_FUNC("NULL patch info pointer\n");
@@ -1109,12 +1125,28 @@ WMT_unlocked_ioctl (
             }
 
 			dWloadSeq = wMtPatchInfo.dowloadSeq;
+            if (!dWloadSeq || dWloadSeq > pAtchNum) {
+                WMT_ERR_FUNC("A690 reject invalid patch sequence %u/%u\n",
+                             dWloadSeq, pAtchNum);
+                iRet = -EINVAL;
+                break;
+            }
+            if (patchInfoSeen & (1U << (dWloadSeq - 1))) {
+                WMT_ERR_FUNC("A690 reject duplicate patch sequence %u\n", dWloadSeq);
+                iRet = -EINVAL;
+                break;
+            }
+            wMtPatchInfo.patchName[sizeof(wMtPatchInfo.patchName) - 1] = '\0';
+            WMT_INFO_FUNC("A690 patch sequence %u/%u: %s\n",
+                          dWloadSeq, pAtchNum, wMtPatchInfo.patchName);
+
 			WMT_DBG_FUNC("current download seq no is %d,patch name is %s,addres info is 0x%02x,0x%02x,0x%02x,0x%02x\n",dWloadSeq,wMtPatchInfo.patchName,wMtPatchInfo.addRess[0],wMtPatchInfo.addRess[1],wMtPatchInfo.addRess[2],wMtPatchInfo.addRess[3]);
 			osal_memcpy(pPatchInfo + dWloadSeq - 1,&wMtPatchInfo,sizeof(WMT_PATCH_INFO));
 			pTemp = pPatchInfo + dWloadSeq - 1;
-			if (++counter == pAtchNum) {
+			patchInfoSeen |= 1U << (dWloadSeq - 1);
+			if (++patchInfoReceived == pAtchNum) {
 				wmt_lib_set_patch_info(pPatchInfo);
-				counter = 0;
+				patchInfoReceived = 0;
 			}
 		}
 		break; 

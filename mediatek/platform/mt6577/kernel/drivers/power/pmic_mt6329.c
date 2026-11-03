@@ -1304,6 +1304,10 @@ void dct_pmic_VCAMD_sel(kal_uint32 volt)
     else if(volt == UPMU_VOLT_1_5_0_0_V){
         upmu_ldo_vosel(LDO_VCAMD, UPMU_VOLT_1_5_0_0_V);
     }
+    else if(volt == VOL_1540) {
+        upmu_ldo_vosel(LDO_VCAMD, UPMU_VOLT_1_5_0_0_V);
+        upmu_ldo_cal(LDO_VCAMD, 14);
+    }
     else if(volt == UPMU_VOLT_1_8_0_0_V){
         upmu_ldo_vosel(LDO_VCAMD, UPMU_VOLT_1_8_0_0_V);
     }

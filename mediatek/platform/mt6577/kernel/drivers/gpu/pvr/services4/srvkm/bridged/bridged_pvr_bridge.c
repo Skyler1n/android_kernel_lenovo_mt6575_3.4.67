@@ -3588,16 +3588,6 @@ PVRSRVInitSrvDisconnectBW(IMG_UINT32 ui32BridgeID,
 				((psRetOUT->eError == PVRSRV_OK) && (psInitSrvDisconnectIN->bInitSuccesful))
 				? IMG_TRUE : IMG_FALSE);
 
-	// MTK yu-fu {{{
-	if (psRetOUT->eError != PVRSRV_OK)
-	{
-		psPerProc->bInitProcess = IMG_FALSE;	
-		PVRSRVSetInitServerState(PVRSRV_INIT_SERVER_RUNNING, IMG_FALSE);
-		PVRSRVSetInitServerState(PVRSRV_INIT_SERVER_RAN, IMG_FALSE);
-		PVRSRVSetInitServerState(PVRSRV_INIT_SERVER_SUCCESSFUL, IMG_FALSE);
-	}
-	// MTK }}}
-
 	return 0;
 }
 

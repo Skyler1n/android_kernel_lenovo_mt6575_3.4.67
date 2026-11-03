@@ -532,6 +532,11 @@ INT32 wmt_ctrl_get_patch_info(P_WMT_CTRL_DATA pWmtCtrlData)
 	downLoadSeq = pWmtCtrlData->au4CtrlData[0];
 	WMT_DBG_FUNC("download seq is %d\n",downLoadSeq);
 
+    if (!pDev->pWmtPatchInfo || !downLoadSeq || downLoadSeq > pDev->patchNum) {
+        WMT_ERR_FUNC("A690 reject patch read sequence %u/%u\n",
+                     downLoadSeq, pDev->patchNum);
+        return -EINVAL;
+    }
 	pPatchinfo = pDev->pWmtPatchInfo + downLoadSeq - 1;
 	pNbuf = (PUCHAR)pWmtCtrlData->au4CtrlData[1];
 	pAbuf = (PUCHAR)pWmtCtrlData->au4CtrlData[2];

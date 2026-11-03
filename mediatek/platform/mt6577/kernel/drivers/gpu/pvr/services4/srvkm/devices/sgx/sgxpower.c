@@ -482,11 +482,23 @@ PVRSRV_ERROR SGXPostPowerState (IMG_HANDLE				hDevHandle,
 			/*
 				Run the SGX init script.
 			*/
+			{
+				int counter = 0;
+				do
+				{
 			eError = SGXInitialise(psDevInfo, IMG_FALSE);
 			if (eError != PVRSRV_OK)
 			{
-				PVR_DPF((PVR_DBG_ERROR,"SGXPostPowerState: SGXInitialise failed"));
+						PVR_DPF((PVR_DBG_ERROR,"SGXPostPowerState: SGXInitialise failed (%d) counter (%d)", eError, counter));
+						if (eError != PVRSRV_ERROR_RETRY)
+						{
 				return eError;
+			}
+		}
+
+					counter ++;
+				}
+				while (eError==PVRSRV_ERROR_RETRY);
 			}
 		}
 		else

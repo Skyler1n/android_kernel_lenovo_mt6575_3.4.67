@@ -1,3 +1,4 @@
+ccflags-y += -I$(src)
 # drivers/video/mtk/Makefile
 #
 # Makefile for MT6516 video driver.

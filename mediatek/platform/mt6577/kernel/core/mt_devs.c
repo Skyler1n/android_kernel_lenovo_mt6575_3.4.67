@@ -785,12 +785,14 @@ static struct platform_device AudDrv_device = {
 /* MTK I2C                                                            */
 /*=======================================================================*/
 //<2012/09/13-Yuting Shih-yaotsulin-13914. Add/modified for NXP NFC PN544 and mt6628 driver
+#if defined(CONFIG_MTK_NFC)
 static struct pn544_i2c_platform_data   pn544_pdata =
 {
     .irq_gpio   = GPIO73,   /* NFC_IRQ  */
     .ven_gpio   = GPIO201,  /* NFC_EN */
     .firm_gpio  = GPIO73,   /* NFC_FIRM, */
 };
+#endif
 
 #if defined( HAWK40_EP0 ) || defined( HAWK40_EP1 ) || defined( HAWK40_EP2 )
 static struct i2c_board_info __initdata i2c_devs0[]={

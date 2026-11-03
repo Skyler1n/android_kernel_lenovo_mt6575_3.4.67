@@ -545,6 +545,7 @@ static int find_img_to_open(int md_id,int img_type, char found_name[])
 	char			post_fix[12];
 	char			post_fix_ex[12];
 	struct file		*filp = NULL;
+	mm_segment_t old_fs;
 	char 			*img_path_list[]={CONFIG_MODEM_FIRMWARE_CIP_PATH,CONFIG_MODEM_FIRMWARE_PATH};
 	// Gen file name
 	get_md_post_fix(md_id,post_fix, post_fix_ex);
@@ -561,7 +562,10 @@ static int find_img_to_open(int md_id,int img_type, char found_name[])
 		CCCI_MSG_INF("ctl", "[Error]Invalid img type%d\n", img_type);
 		return -1;
 	}	
-	for(j=0;j<sizeof(img_path_list);j++)
+	/* Both filenames and read buffers in this loader live in the kernel. */
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	for(j=0;j<ARRAY_SIZE(img_path_list);j++)
 	{
 		CCCI_MSG_INF("ctl","Find img in %s\n",img_path_list[j]);
 		for(i=0; i<3; i++)
@@ -569,10 +573,10 @@ static int find_img_to_open(int md_id,int img_type, char found_name[])
 			CCCI_MSG_INF("ctl","try to open %s ...\n", img_name[i]);
 			snprintf(full_path, 64, "%s%s", img_path_list[j], img_name[i]);
 			filp = filp_open(full_path, O_RDONLY, 0644);
-			CCCI_MSG_INF("ctl","opened %s ,err=%d\n", img_name[i],IS_ERR(filp));
+			CCCI_MSG_INF("ctl","opened %s ,err=%ld\n", img_name[i],IS_ERR(filp) ? PTR_ERR(filp) : 0L);
 			if (IS_ERR(filp)==0) 
 			{
-				snprintf(found_name, 64, full_path);
+				snprintf(found_name, 64, "%s", full_path);
 				filp_close(filp, current->files);
 				if(i==1) {
 					snprintf(md_image_post_fix, sizeof(md_image_post_fix), "%s", post_fix);
@@ -581,10 +585,12 @@ static int find_img_to_open(int md_id,int img_type, char found_name[])
 				} else {
 					md_image_post_fix[0] = '\0';
 				}
+				set_fs(old_fs);
 				return 0;
 			}
 		}
 	}
+	set_fs(old_fs);
 	md_image_post_fix[0] = '\0';
 	CCCI_MSG_INF("ctl","[Error] No Image file found, Orz...\n");
 	return -1;
@@ -641,7 +647,8 @@ static int load_firmware_func(struct image_info *img)
 
     //get modem&dsp image name with E1&E2 
 	if(find_img_to_open(0,img->type, img->file_name)<0) {
-		CCCI_MSG_INF("ctl", "Find image  %s failed\n",img->file_name);
+		CCCI_MSG_INF("ctl", "Find image type %d failed\n",img->type);
+		ret = -E_FILE_OPEN;
 		filp = NULL;
 		goto out;
 	}

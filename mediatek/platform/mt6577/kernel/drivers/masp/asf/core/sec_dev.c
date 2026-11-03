@@ -40,110 +40,66 @@ extern SECURE_INFO                  sec_info;
  **************************************************************************/
 int read_info (int part_index, uint32 part_off, uint32 search_region, char* info_name, uint32 info_name_len, uint32 info_sz, char* info_buf)
 {
-    int ret  = ERR_MTD_INFO_NOT_FOUND;    
-    char part_path[32];        
-    uint32 off = 0;    
-    uchar *buf;
-    
-    MtdRCtx *ctx = (MtdRCtx*) osal_kmalloc(sizeof(MtdRCtx));  
+    int ret = ERR_MTD_INFO_NOT_FOUND;
+    char part_path[32];
+    uint32 off;
+    MtdRCtx *ctx;
 
-    if (ctx == NULL) 
-    {
-        ret = ERR_ROM_INFO_ALLOCATE_BUF_FAIL;
-        goto _end;
-    }
-
+    if (!search_region || info_sz > search_region)
+        return ERR_ROM_INFO_MTD_READ_FAIL;
+    ctx = osal_kmalloc(sizeof(*ctx));
+    if (!ctx)
+        return ERR_ROM_INFO_ALLOCATE_BUF_FAIL;
+    ctx->fd = ASF_FILE_NULL;
     ctx->buf = osal_kmalloc(search_region);
-    memset(ctx->buf,0,search_region);
-
-    if (ctx->buf == NULL) 
-    {
+    if (!ctx->buf) {
         ret = ERR_ROM_INFO_ALLOCATE_BUF_FAIL;
-        goto _end;
+        goto out_free;
     }
+    memset(ctx->buf, 0, search_region);
 
-    /* ------------------------ */    
-    /* open file                */
-    /* ------------------------ */    
-    /* in order to keep key finding process securely,
-       open file in kernel module */    
-    if(TRUE == sec_usif_enabled())
-    {
-        sec_usif_part_path(part_index,part_path,sizeof(part_path));
-        if(FALSE == dump_search_info)
-        {
-            SMSG(TRUE,"[%s] open '%s'\n",MOD,part_path);                 
-            dump_search_info = TRUE;
-        }
-    }    
+    if (TRUE == sec_usif_enabled())
+        sec_usif_part_path(part_index, part_path, sizeof(part_path));
     else
-    {
-        sprintf(part_path, "/dev/mtd/mtd%d", part_index);
-        if(FALSE == dump_search_info)
-        {
-            SMSG(TRUE,"[%s] open '%s'\n",MOD,part_path);                     
-            dump_search_info = TRUE;
-        }
-    }
+        snprintf(part_path, sizeof(part_path), "/dev/mtd/mtd%d", part_index);
 
-    ctx->fd = ASF_OPEN(part_path);
-            
-    if (ASF_IS_ERR(ctx->fd)) 
-    {
-        SMSG(true,"[%s] open fail\n",MOD);     
-        ret = ERR_INFO_PART_NOT_FOUND;
-        goto _open_fail;
-    }
-
-    
-    /* ------------------------ */    
-    /* read partition           */
-    /* ------------------------ */    
-    /* configure file system type */
+    /* filp_open also consumes a kernel pathname. Set KERNEL_DS before open,
+     * not only before read: ccci_mdinit enters this path from a user task. */
     osal_set_kernel_fs();
-
-    /* adjust read off */
-    ASF_SEEK_SET(ctx->fd,part_off);     
-    
-    /* read partition */
-    if(0 >= (ret = ASF_READ(ctx->fd,ctx->buf,search_region)))
-    {
-        SMSG(TRUE,"[%s] read fail (%d)\n",MOD,ret);
-        ret = ERR_ROM_INFO_MTD_READ_FAIL;
-        goto _end;
+    ctx->fd = ASF_OPEN(part_path);
+    if (ASF_IS_ERR(ctx->fd)) {
+        SMSG(TRUE, "[%s] open %s failed\n", MOD, part_path);
+        ret = ERR_INFO_PART_NOT_FOUND;
+        goto out_restore;
     }
-    else
-    {
-        /* ------------------------ */    
-        /* search info              */
-        /* ------------------------ */    
-        for(off = 0; off<(search_region-info_sz); off++)
-        {
-            buf = ctx->buf + off;
-
-            if(0 == strncmp(buf,info_name,info_name_len))
-            {                    
-                osal_mtd_lock();
-                    
-                /* ------------------------ */    
-                /* fill info                */
-                /* ------------------------ */    
-                mcpy(info_buf, buf, info_sz);                 
-
-                ret = SEC_OK;
-                osal_mtd_unlock();                    
-                break;
-                }
+    if (ASF_SEEK_SET(ctx->fd, part_off) < 0) {
+        ret = ERR_ROM_INFO_MTD_READ_FAIL;
+        goto out_close;
+    }
+    ret = ASF_READ(ctx->fd, ctx->buf, search_region);
+    if (ret < 0 || (uint32)ret < info_sz) {
+        ret = ERR_ROM_INFO_MTD_READ_FAIL;
+        goto out_close;
+    }
+    /* Search only the bytes actually returned by the device. */
+    search_region = ret;
+    ret = ERR_MTD_INFO_NOT_FOUND;
+    for (off = 0; off <= search_region - info_sz; off++) {
+        if (!memcmp(ctx->buf + off, info_name, info_name_len)) {
+            osal_mtd_lock();
+            mcpy(info_buf, ctx->buf + off, info_sz);
+            osal_mtd_unlock();
+            ret = SEC_OK;
+            break;
         }
     }
-    
-_end:
+out_close:
     ASF_CLOSE(ctx->fd);
+out_restore:
     osal_restore_fs();
-    
-_open_fail :    
+out_free:
     osal_kfree(ctx->buf);
-    osal_kfree(ctx);            
+    osal_kfree(ctx);
     return ret;
 }
 
