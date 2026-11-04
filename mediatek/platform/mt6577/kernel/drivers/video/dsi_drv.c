@@ -528,6 +528,22 @@ DSI_STATUS DSI_DisableClk(void)
 
 DSI_STATUS DSI_Reset(void)
 {
+#if defined(CONFIG_ARCH_MT6575) && !defined(BUILD_UBOOT)
+    /* MT6575 GB/ICS use a controller-only reset.  The MT6577 sequence
+     * below additionally drives PHY test patterns and reserved PHY_CON
+     * bits; keep the older silicon on its original reset sequence.
+     */
+    static unsigned int reset_log_count;
+
+    DSI_REG->DSI_COM_CTRL.DSI_RESET = 1;
+    lcm_mdelay(5);
+    DSI_REG->DSI_COM_CTRL.DSI_RESET = 0;
+    if (reset_log_count++ < 8)
+        DISP_LOG_PRINT(ANDROID_LOG_INFO, "DSI",
+            "[MT6575] legacy DSI reset caller=%pS\n",
+            __builtin_return_address(0));
+    return DSI_STATUS_OK;
+#else
     // step 1: make waveform to return LP11
     DSI_PHY_REG->MIPITX_CONB.BIST_PATTERN0_15 = 0x0005;
     DSI_PHY_REG->MIPITX_CONC.BIST_PATTERN0_15 = 0x0707;
@@ -549,6 +565,7 @@ DSI_STATUS DSI_Reset(void)
     DSI_PHY_REG->MIPITX_CONA.MIPI_SW_CTL = 0x0;          //SW control mode release
 
     return DSI_STATUS_OK;
+#endif
 }
 
 unsigned int DSI_GetMode(void)
