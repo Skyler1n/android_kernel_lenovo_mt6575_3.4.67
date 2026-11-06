@@ -2,7 +2,8 @@
 #include <linux/types.h>
 
 static struct vibrator_hw cust_vibrator_hw = {
-	.vib_timer = 50,
+	/* Match ICS: honor Android short haptic durations without a 50 ms floor. */
+	.vib_timer = 10,
 	.vib_timer_min = 10,
 };
 
