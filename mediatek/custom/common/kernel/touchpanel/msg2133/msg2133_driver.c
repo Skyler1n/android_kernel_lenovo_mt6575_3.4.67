@@ -133,22 +133,10 @@ static struct i2c_driver msg2133_i2c_driver = {
     .address_list = (const unsigned short *)forces,
 };
 
-static unsigned char msg2133_checksum(const unsigned char *packet)
-{
-    int i;
-    int sum = 0;
-
-    for (i = 0; i < MSG2133_PACKET_SIZE - 1; i++)
-        sum += packet[i];
-
-    return (unsigned char)((-sum) & 0xff);
-}
-
 static int msg2133_i2c_read(unsigned char *packet)
 {
     int ret;
     static int read_fail_count;
-    static int read_ok_logged;
     unsigned short old_addr = i2c_client->addr;
 
     i2c_client->timing = 100;
@@ -162,13 +150,6 @@ static int msg2133_i2c_read(unsigned char *packet)
             TPD_DMESG("msg2133 i2c read failed: %d, count=%d\n",
                       ret, read_fail_count);
         return ret < 0 ? ret : -EIO;
-    }
-
-    if (!read_ok_logged) {
-        read_ok_logged = 1;
-        TPD_DMESG("msg2133 first packet: %02x %02x %02x %02x %02x %02x %02x %02x\n",
-                  packet[0], packet[1], packet[2], packet[3],
-                  packet[4], packet[5], packet[6], packet[7]);
     }
 
     return 0;
@@ -187,7 +168,6 @@ static void msg2133_power_off(void)
 static void msg2133_reset(void)
 {
     MSG2133_BOARD_RESET();
-    TPD_DMESG("msg2133 board reset done\n");
 }
 
 static int msg2133_parse_packet(unsigned char *packet,
@@ -198,18 +178,8 @@ static int msg2133_parse_packet(unsigned char *packet,
     int dx;
     int dy;
 
-    static int bad_packet_count;
-
     if (packet[0] != MSG2133_PACKET_ID)
         return -EINVAL;
-
-    if (msg2133_checksum(packet) != packet[MSG2133_PACKET_SIZE - 1]) {
-        bad_packet_count++;
-        if (bad_packet_count <= 10 || (bad_packet_count % 100) == 0)
-            TPD_DMESG("msg2133 checksum mismatch: got=%02x calc=%02x count=%d\n",
-                      packet[MSG2133_PACKET_SIZE - 1],
-                      msg2133_checksum(packet), bad_packet_count);
-    }
 
     if (packet[1] == 0xff && packet[2] == 0xff && packet[3] == 0xff &&
         packet[4] == 0xff) {
@@ -404,13 +374,9 @@ static int msg2133_i2c_probe(struct i2c_client *client,
                              tpd_eint_interrupt_handler, 1);
     mt_eint_unmask(MSG2133_BOARD_EINT_NUM);
 
-    TPD_DMESG("msg2133 eint: num=%d sens=%d debounce=%d polarity=%d\n",
-              MSG2133_BOARD_EINT_NUM, MSG2133_BOARD_EINT_SENSITIVE,
-              MSG2133_BOARD_EINT_DEBOUNCE_CN, MSG2133_BOARD_EINT_POLARITY);
 
     tpd_type_cap = 1;
     tpd_load_status = 1;
-    TPD_DMESG("MSG2133 touch panel probe done\n");
 
     return 0;
 }
@@ -422,7 +388,6 @@ static int msg2133_i2c_remove(struct i2c_client *client)
 
 static int tpd_local_init(void)
 {
-    TPD_DMESG("MediaTek MSG2133 touch panel driver init\n");
 
     if (i2c_add_driver(&msg2133_i2c_driver) != 0) {
         TPD_DMESG("unable to add MSG2133 i2c driver\n");

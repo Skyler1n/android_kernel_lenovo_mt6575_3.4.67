@@ -1137,8 +1137,6 @@ WMT_unlocked_ioctl (
                 break;
             }
             wMtPatchInfo.patchName[sizeof(wMtPatchInfo.patchName) - 1] = '\0';
-            WMT_INFO_FUNC("A690 patch sequence %u/%u: %s\n",
-                          dWloadSeq, pAtchNum, wMtPatchInfo.patchName);
 
 			WMT_DBG_FUNC("current download seq no is %d,patch name is %s,addres info is 0x%02x,0x%02x,0x%02x,0x%02x\n",dWloadSeq,wMtPatchInfo.patchName,wMtPatchInfo.addRess[0],wMtPatchInfo.addRess[1],wMtPatchInfo.addRess[2],wMtPatchInfo.addRess[3]);
 			osal_memcpy(pPatchInfo + dWloadSeq - 1,&wMtPatchInfo,sizeof(WMT_PATCH_INFO));

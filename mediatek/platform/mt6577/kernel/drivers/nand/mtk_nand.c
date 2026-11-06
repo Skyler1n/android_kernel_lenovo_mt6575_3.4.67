@@ -406,8 +406,6 @@ bool get_device_info(u8*id, flashdev_info *devinfo)
 
     if (!memcmp(id, a690_nand.id, a690_nand.id_length)) {
         *devinfo = a690_nand;
-        printk(KERN_INFO "[NAND] A690 exact ID EC BC 00 6A 56: "
-               "16-bit 4K page 128 spare ECC4 256K erase 512MiB\n");
         return true;
     }
     for (i = 0; i<CHIP_CNT; i++){
@@ -3523,17 +3521,12 @@ static int mtk_nand_probe(struct platform_device *pdev)
     manu_id = id[0];
     dev_id = id[1];
 
-    printk(KERN_INFO "[NAND] READID %02x %02x %02x %02x %02x\n",
-           id[0], id[1], id[2], id[3], id[4]);
     if (!get_device_info(id,&devinfo))
     {
         printk(KERN_ERR "[NAND] Unsupported ID; refusing unconfigured scan\n");
         err = -ENODEV;
         goto out_unscanned;
     }
-    printk(KERN_INFO "[NAND] bus=%u page=%u spare=%u erase=%uK timing=%08x\n",
-           devinfo.iowidth, devinfo.pagesize, devinfo.sparesize,
-           devinfo.blocksize, devinfo.timmingsetting);
 
     if (devinfo.pagesize == 4096)
     {

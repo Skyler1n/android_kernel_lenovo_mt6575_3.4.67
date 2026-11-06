@@ -569,44 +569,17 @@ static void __init clean_rootfs(void)
 }
 #endif
 
-
-static char a690_unpack_status[128] __initdata = "no external initrd";
-static unsigned long a690_unpack_begin __initdata, a690_unpack_end __initdata;
-static unsigned char a690_unpack_magic[4] __initdata;
-int __init a690_report_unpack(void)
-{
-    printk(KERN_EMERG "[A690:rootfs] virtual=%08lx-%08lx magic=%02x%02x%02x%02x result=%s\n",
-           a690_unpack_begin, a690_unpack_end,
-           a690_unpack_magic[0], a690_unpack_magic[1],
-           a690_unpack_magic[2], a690_unpack_magic[3], a690_unpack_status);
-    return 0;
-}
-late_initcall(a690_report_unpack);
-
 static int __init populate_rootfs(void)
 {
 	char *err = unpack_to_rootfs(__initramfs_start, __initramfs_size);
 	if (err)
 		panic(err);	/* Failed to decompress INTERNAL initramfs */
-	if (!initrd_start) {
-        extern void a690_panic_missing_initrd(void);
-        a690_panic_missing_initrd();
-    }
 	if (initrd_start) {
-        a690_unpack_begin = initrd_start;
-        a690_unpack_end = initrd_end;
-        if (initrd_end - initrd_start >= 4)
-            memcpy(a690_unpack_magic, (void *)initrd_start, 4);
 #ifdef CONFIG_BLK_DEV_RAM
 		int fd;
 		printk(KERN_INFO "Trying to unpack rootfs image as initramfs...\n");
 		err = unpack_to_rootfs((char *)initrd_start,
 			initrd_end - initrd_start);
-        strlcpy(a690_unpack_status, err ? err : "unpacked successfully", sizeof(a690_unpack_status));
-        if (err)
-            panic("A690 initramfs error=%s va=%08lx-%08lx magic=%02x%02x%02x%02x",
-                  err, a690_unpack_begin, a690_unpack_end,
-                  a690_unpack_magic[0], a690_unpack_magic[1], a690_unpack_magic[2], a690_unpack_magic[3]);
 		if (!err) {
 			free_initrd();
 			return 0;
@@ -628,11 +601,6 @@ static int __init populate_rootfs(void)
 		printk(KERN_INFO "Unpacking initramfs...\n");
 		err = unpack_to_rootfs((char *)initrd_start,
 			initrd_end - initrd_start);
-        strlcpy(a690_unpack_status, err ? err : "unpacked successfully", sizeof(a690_unpack_status));
-        if (err)
-            panic("A690 initramfs error=%s va=%08lx-%08lx magic=%02x%02x%02x%02x",
-                  err, a690_unpack_begin, a690_unpack_end,
-                  a690_unpack_magic[0], a690_unpack_magic[1], a690_unpack_magic[2], a690_unpack_magic[3]);
 		if (err)
 			printk(KERN_EMERG "Initramfs unpacking failed: %s\n", err);
 		free_initrd();

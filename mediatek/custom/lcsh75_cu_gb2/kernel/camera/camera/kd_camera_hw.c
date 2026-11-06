@@ -17,20 +17,8 @@
  * Debug configuration
 ******************************************************************************/
 #define PFX "[kd_camera_hw]"
-#define PK_DBG_NONE(fmt, arg...)    do {} while (0)
-#define PK_DBG_FUNC(fmt, arg...)    printk(KERN_INFO PFX "%s: " fmt, __FUNCTION__ ,##arg)
-
-#define DEBUG_CAMERA_HW_K
-#ifdef DEBUG_CAMERA_HW_K
-#define PK_DBG PK_DBG_FUNC
-#define PK_ERR(fmt, arg...)         printk(KERN_ERR PFX "%s: " fmt, __FUNCTION__ ,##arg)
-#else
-#define PK_DBG(a,...)
-#define PK_ERR(a,...)
-#endif
-
-
-
+#define PK_DBG(fmt, arg...) do { } while (0)
+#define PK_ERR(fmt, arg...) printk(KERN_ERR PFX "%s: " fmt, __FUNCTION__, ##arg)
 
 /* Official A690 HI351 board sequence; PDN is active low for this module. */
 static int a690_hi351_power(BOOL on, char *mode)
@@ -179,7 +167,6 @@ u32 pinSet[3][8] = {
         //in case
 
 #if 0 //TODO: depends on HW layout. Should be notified by SA.
-        printk("Set CAMERA_POWER_PULL_PIN for power \n");
         if (mt_set_gpio_pull_enable(GPIO_CAMERA_LDO_EN_PIN, GPIO_PULL_DISABLE)) {PK_DBG("[[CAMERA SENSOR] Set CAMERA_POWER_PULL_PIN DISABLE ! \n"); }
         if(mt_set_gpio_mode(GPIO_CAMERA_LDO_EN_PIN, GPIO_CAMERA_LDO_EN_PIN_M_GPIO)){PK_DBG("[[CAMERA SENSOR] set CAMERA_POWER_PULL_PIN mode failed!! \n");}
         if(mt_set_gpio_dir(GPIO_CAMERA_LDO_EN_PIN,GPIO_DIR_OUT)){PK_DBG("[[CAMERA SENSOR] set CAMERA_POWER_PULL_PIN dir failed!! \n");}
@@ -260,7 +247,6 @@ u32 pinSet[3][8] = {
     else {//power OFF
 
 #if 0 //TODO: depends on HW layout. Should be notified by SA.
-        printk("Set GPIO 94 for power OFF\n");
         if (mt_set_gpio_pull_enable(GPIO_CAMERA_LDO_EN_PIN, GPIO_PULL_DISABLE)) {PK_DBG("[CAMERA SENSOR] Set GPIO94 PULL DISABLE ! \n"); }
         if(mt_set_gpio_mode(GPIO_CAMERA_LDO_EN_PIN, GPIO_CAMERA_LDO_EN_PIN_M_GPIO)){PK_DBG("[CAMERA SENSOR] set gpio mode failed!! \n");}
         if(mt_set_gpio_dir(GPIO_CAMERA_LDO_EN_PIN,GPIO_DIR_OUT)){PK_DBG("[CAMERA SENSOR] set gpio dir failed!! \n");}

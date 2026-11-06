@@ -117,17 +117,9 @@
 
 
 
-#define __SENSOR_CONTROL__
-
-#ifdef __SENSOR_CONTROL__
-#define SENSOR_CONTROL_FLOW() 	printk("[%s:%s:%d]\t\n",__FILE__,__FUNCTION__,__LINE__)
-#define SENSOR_LOG(fmt, arg...) printk("[Line=%4d]\t\n"fmt,__LINE__,##arg)
-#define SENSOR_ERR(fmt, arg...) printk("[Line=%4d]\t\n"fmt,__LINE__,##arg)
-#else
-#define SENSOR_CONTROL_FLOW()
-#define SENSOR_LOG(fmt, arg...)
-#define SENSOR_ERR(fmt, arg...)
-#endif
+#define SENSOR_CONTROL_FLOW() do { } while (0)
+#define SENSOR_LOG(fmt, arg...) do { } while (0)
+#define SENSOR_ERR(fmt, arg...) printk(KERN_ERR "ov3660: " fmt, ##arg)
 
 static MSDK_SENSOR_CONFIG_STRUCT OV3660SensorConfigData;
 static struct OV3660_Sensor_Struct OV3660_Sensor_Driver;
@@ -2297,7 +2289,6 @@ static kal_uint32 OV3660_YUVSensorSetting(FEATURE_ID iCmd, UINT16 iPara)
 	switch (iCmd) {
 		case FID_SCENE_MODE:// TODO:
 
-		printk("FID_SCENE_MODE     9527-Test     iPara=%d\n",iPara);
 		    if (iPara == SCENE_MODE_OFF){
 		       OV3660_night_mode(KAL_FALSE);
 		    }else if (iPara == SCENE_MODE_NIGHTSCENE){

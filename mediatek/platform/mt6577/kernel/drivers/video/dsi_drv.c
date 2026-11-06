@@ -533,15 +533,9 @@ DSI_STATUS DSI_Reset(void)
      * below additionally drives PHY test patterns and reserved PHY_CON
      * bits; keep the older silicon on its original reset sequence.
      */
-    static unsigned int reset_log_count;
-
     DSI_REG->DSI_COM_CTRL.DSI_RESET = 1;
     lcm_mdelay(5);
     DSI_REG->DSI_COM_CTRL.DSI_RESET = 0;
-    if (reset_log_count++ < 8)
-        DISP_LOG_PRINT(ANDROID_LOG_INFO, "DSI",
-            "[MT6575] legacy DSI reset caller=%pS\n",
-            __builtin_return_address(0));
     return DSI_STATUS_OK;
 #else
     // step 1: make waveform to return LP11

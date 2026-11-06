@@ -896,11 +896,6 @@ static int __init kernel_init(void * unused)
 		ramdisk_execute_command = "/init";
 
 	if (sys_access((const char __user *) ramdisk_execute_command, 0) != 0) {
-        extern int a690_report_initrd(void);
-        extern int a690_report_unpack(void);
-        printk(KERN_EMERG "[A690] Cannot access /init; reporting saved ramdisk evidence\n");
-        a690_report_initrd();
-        a690_report_unpack();
 		ramdisk_execute_command = NULL;
 		prepare_namespace();
 	}

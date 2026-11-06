@@ -17,7 +17,6 @@
 
 #define HI351_ID 0xa4
 #define HI351_I2C_ID 0x40
-#define HI351_LOG(fmt, args...) printk(KERN_INFO "[HI351-A690-3.4-v1] " fmt, ##args)
 extern int iReadRegI2C(u8 *, u16, u8 *, u16, u16);
 extern int iWriteRegI2C(u8 *, u16, u16);
 static MSDK_SENSOR_CONFIG_STRUCT hi351_config;
@@ -33,14 +32,14 @@ static void HI351_write_cmos_sensor(unsigned int reg, unsigned int value)
     u8 data[2] = { reg, value };
     int rc = iWriteRegI2C(data, 2, HI351_I2C_ID);
     if (rc < 0 && hi351_i2c_errors++ < 8)
-        HI351_LOG("I2C write %02x=%02x failed: %d\n", reg, value & 255, rc);
+        pr_err("hi351: I2C write %02x=%02x failed: %d\n", reg, value & 255, rc);
 }
 static u8 HI351_read_cmos_sensor(unsigned int reg)
 {
     u8 addr = reg, value = 0;
     int rc = iReadRegI2C(&addr, 1, &value, 1, HI351_I2C_ID);
     if (rc < 0 && hi351_i2c_errors++ < 8)
-        HI351_LOG("I2C read %02x failed: %d\n", reg, rc);
+        pr_err("hi351: I2C read %02x failed: %d\n", reg, rc);
     return value;
 }
 static void hi351_apply(const struct hi351_reg *regs, unsigned int count)
@@ -76,14 +75,11 @@ static UINT32 HI351Open(void)
             break;
     }
     mdelay(20);
-    HI351_LOG("open sensor ID=%02x, errors=%u\n", id, hi351_i2c_errors);
     if (id != HI351_ID)
         return ERROR_SENSOR_CONNECT_FAIL;
     HI351_APPLY(hi351_official_init);
     HI351_write_cmos_sensor(3, 0);
     HI351_write_cmos_sensor(0x11, (HI351_read_cmos_sensor(0x11) & 0xfc) | 3);
-    HI351_LOG("official init complete, entries=%u, errors=%u\n",
-              (unsigned int)ARRAY_SIZE(hi351_official_init), hi351_i2c_errors);
     return hi351_i2c_errors ? ERROR_SENSOR_CONNECT_FAIL : ERROR_NONE;
 }
 static UINT32 HI351Close(void) { return ERROR_NONE; }
@@ -132,7 +128,6 @@ static UINT32 HI351Preview(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *w,
     w->ExposureWindowWidth = 624; w->ExposureWindowHeight = 468;
     msleep(10);
     memcpy(&hi351_config, c, sizeof(*c));
-    HI351_LOG("preview, errors=%u\n", hi351_i2c_errors);
     return ERROR_NONE;
 }
 static UINT32 HI351Capture(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *w,
@@ -165,7 +160,6 @@ static UINT32 HI351Capture(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *w,
         HI351_write_cmos_sensor(0x33, 0);
         HI351_write_cmos_sensor(0x32, 1);
         w->ExposureWindowWidth = 2032; w->ExposureWindowHeight = 1524;
-        HI351_LOG("capture shutter=%u, errors=%u\n", shutter, hi351_i2c_errors);
     } else {
         w->ExposureWindowWidth = 624; w->ExposureWindowHeight = 468;
     }
@@ -478,7 +472,6 @@ static UINT32 HI351FeatureControl(MSDK_SENSOR_FEATURE_ENUM feature,
         }
         p32[0] = id == HI351_ID ? HI351_ID : 0xffffffff;
         *length = 4;
-        HI351_LOG("probe ID=%02x\n", id);
         return id == HI351_ID ? ERROR_NONE : ERROR_SENSOR_CONNECT_FAIL;
     }
     case SENSOR_FEATURE_GET_RESOLUTION:

@@ -38,23 +38,6 @@
 
 static unsigned long phys_initrd_start __initdata = 0;
 static unsigned long phys_initrd_size __initdata = 0;
-/* Repeat early ramdisk reservation evidence late enough for SRAM last_kmsg. */
-static unsigned long a690_rd_start __initdata, a690_rd_size __initdata;
-static const char *a690_rd_status __initdata = "not checked";
-int __init a690_report_initrd(void)
-{
-    printk(KERN_EMERG "[A690:initrd] physical=%08lx+%08lx kernel_end=%08lx status=%s\n",
-           a690_rd_start, a690_rd_size, (unsigned long)__pa(_end), a690_rd_status);
-    return 0;
-}
-late_initcall(a690_report_initrd);
-void __init a690_panic_missing_initrd(void)
-{
-    panic("A690 missing initrd: phys=%08lx+%08lx kernel_end=%08lx status=%s",
-          a690_rd_start, a690_rd_size, (unsigned long)__pa(_end), a690_rd_status);
-}
-
-
 
 static int __init early_initrd(char *p)
 {
@@ -363,21 +346,16 @@ void __init arm_memblock_init(struct meminfo *mi, struct machine_desc *mdesc)
 	memblock_reserve(__pa(_stext), _end - _stext);
 #endif
 #ifdef CONFIG_BLK_DEV_INITRD
-    a690_rd_start = phys_initrd_start;
-    a690_rd_size = phys_initrd_size;
-    a690_rd_status = phys_initrd_size ? "accepted" : "no tag/size";
 	if (phys_initrd_size &&
 	    !memblock_is_region_memory(phys_initrd_start, phys_initrd_size)) {
 		pr_err("INITRD: 0x%08lx+0x%08lx is not a memory region - disabling initrd\n",
 		       phys_initrd_start, phys_initrd_size);
-        a690_rd_status = "outside RAM";
 		phys_initrd_start = phys_initrd_size = 0;
 	}
 	if (phys_initrd_size &&
 	    memblock_is_region_reserved(phys_initrd_start, phys_initrd_size)) {
 		pr_err("INITRD: 0x%08lx+0x%08lx overlaps in-use memory region - disabling initrd\n",
 		       phys_initrd_start, phys_initrd_size);
-        a690_rd_status = "overlaps reserved/kernel";
 		phys_initrd_start = phys_initrd_size = 0;
 	}
 	if (phys_initrd_size) {
