@@ -156,3 +156,29 @@ config MTK_HIBERNATION
 
 endmenu
 
+
+choice
+    prompt "MT6575 E2 CPU maximum frequency"
+    depends on ARCH_MT6575 && CPU_FREQ
+    default MT6575_CPU_1001
+    help
+      Select the highest normal operating point. Overclock profiles retain
+      the stock voltage table, low-frequency OPPs and thermal limiting.
+      MT6575 E1 retains its stock frequency table.
+
+config MT6575_CPU_1001
+    bool "1001 MHz (stock)"
+
+config MT6575_CPU_1066
+    bool "1066 MHz (validated on Lenovo A690)"
+    help
+      Uses ARMPLL 0x51a0 with the stock DVS11 voltage. Higher requests
+      were clipped to this rate on the tested A690; verify other devices.
+
+config MT6575_CPU_1092
+    bool "1092 MHz (experimental)"
+
+config MT6575_CPU_1209
+    bool "1209 MHz (experimental)"
+
+endchoice

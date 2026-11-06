@@ -124,7 +124,23 @@ static struct early_suspend mtk_cpufreq_early_suspend_handler =
 #define DVFS_F1_MT6575_E1       DVFS_F2
 #define DVFS_F2_MT6575_E1       DVFS_F6
 
+/* MT6575 E2 profiles keep the stock PMIC voltage table and low OPPs. */
+#if defined(CONFIG_MT6575_CPU_1066)
+#define MT6575_OC_FREQ          (1066000)
+#define MT6575_OC_ARMPLL        (0x51A0)
+#elif defined(CONFIG_MT6575_CPU_1092)
+#define MT6575_OC_FREQ          (1092000)
+#define MT6575_OC_ARMPLL        (0x53A0)
+#elif defined(CONFIG_MT6575_CPU_1209)
+#define MT6575_OC_FREQ          (1209000)
+#define MT6575_OC_ARMPLL        (0x5CA0)
+#endif
+
+#ifdef MT6575_OC_FREQ
+#define DVFS_F1_MT6575_E2       MT6575_OC_FREQ
+#else
 #define DVFS_F1_MT6575_E2       DVFS_F2
+#endif
 #define DVFS_F2_MT6575_E2       DVFS_F6
 #define DVFS_F3_MT6575_E2       DVFS_F7
 #define DVFS_F4_MT6575_E2       DVFS_F8
@@ -210,6 +226,12 @@ static struct mtk_cpu_freq_info mt6575_freqs_e2[] = {
     OP(DVFS_F4_MT6575_E2),
     OP(DVFS_F3_MT6575_E2),
     OP(DVFS_F2_MT6575_E2),
+#ifdef MT6575_OC_FREQ
+    OP(DVFS_F2),
+#ifdef CONFIG_MT6575_CPU_1209
+    OP(1092000),
+#endif
+#endif
     OP(DVFS_F1_MT6575_E2),
 };
 
@@ -299,8 +321,54 @@ static unsigned int mtk_cpufreq_get(unsigned int cpu)
 * 1. frequency ramp up need to wait voltage settle
 * 2. frequency ramp down do not need to wait voltage settle
 ************************************************************/
+#ifdef MT6575_OC_FREQ
+/* Switch MT6575's CPU mux to CLKSQ while the ARMPLL is reprogrammed. */
+static void mt6575_cpufreq_set_pll(unsigned int pll)
+{
+    unsigned int mux = DRV_Reg32(TOP_CKMUXSEL);
+
+    DRV_WriteReg32(TOP_CKMUXSEL, mux & ~0x0200);
+    DRV_WriteReg32(TOP_CKMUXSEL, mux & ~0x020c);
+    mb();
+    DRV_WriteReg32(ARMPLL_CON0, pll);
+    udelay(PMIC_SETTLE_TIME);
+    DRV_WriteReg32(TOP_CKDIV1, 0x00);
+    DRV_WriteReg32(TOP_CKMUXSEL, (mux & ~0x020c) | 0x0008);
+    DRV_WriteReg32(TOP_CKMUXSEL, (mux & ~0x000c) | 0x0208);
+    mb();
+}
+#endif
+
 static void mtk_cpufreq_set(unsigned int freq_old, unsigned int freq_new)
 {
+#ifdef MT6575_OC_FREQ
+    if (get_chip_ver() >= CHIP_6575_E2 && get_chip_ver() < CHIP_6577_E1)
+    {
+        if (freq_new == MT6575_OC_FREQ || freq_new == 1092000)
+        {
+            /* DVS11 is MT6575's stock 1 GHz voltage, not MT6577's DVS00. */
+#ifdef MTK_BUCK_ADJUST
+            DRV_WriteReg32(SC_AP_DVFS_CON,
+                          (DRV_Reg32(SC_AP_DVFS_CON) & ~0x03) | 0x03);
+            mb();
+            udelay(PMIC_SETTLE_TIME);
+#endif
+            mt6575_cpufreq_set_pll(freq_new == 1092000 ?
+                                   0x53A0 : MT6575_OC_ARMPLL);
+            g_cur_freq = freq_new;
+            return;
+        }
+        if (freq_old > DVFS_F2)
+        {
+            /* All stock dividers, including F8, require the 1001 MHz PLL. */
+            mt6575_cpufreq_set_pll(0x4CA0);
+            freq_old = DVFS_F2;
+            g_cur_freq = DVFS_F2;
+            if (freq_new == DVFS_F2)
+                return;
+        }
+    }
+#endif
     if (freq_new == DVFS_F1) /* change ARMPLL to 1.2G mode */
     {
         #ifdef MTK_BUCK_ADJUST
@@ -862,7 +930,7 @@ static int mtk_cpufreq_init(struct cpufreq_policy *policy)
         policy->cpuinfo.min_freq = DVFS_F4_MT6575_E2;
         policy->cpuinfo.max_freq = DVFS_F1_MT6575_E2;
 
-        policy->cur = DVFS_F1_MT6575_E2;
+        policy->cur = DVFS_F2;
         policy->max = DVFS_F1_MT6575_E2;
         policy->min = DVFS_F4_MT6575_E2;
         ret = setup_freqs_table(policy, ARRAY_AND_SIZE(mt6575_freqs_e2));
@@ -886,12 +954,18 @@ static int mtk_cpufreq_init(struct cpufreq_policy *policy)
     return 0;
 }
 
+static struct freq_attr *mtk_cpufreq_attrs[] = {
+    &cpufreq_freq_attr_scaling_available_freqs,
+    NULL,
+};
+
 static struct cpufreq_driver mtk_cpufreq_driver = {
     .verify = mtk_cpufreq_verify,
     .target = mtk_cpufreq_target,
     .init   = mtk_cpufreq_init,
     .get    = mtk_cpufreq_get,
     .name   = "mtk-cpufreq",
+    .attr   = mtk_cpufreq_attrs,
 };
 
 /*********************************
@@ -968,6 +1042,13 @@ void cpufreq_thermal_protect(unsigned int limited_opp)
 
     if (limited_opp == DVFS_OPP0)
     {
+#ifdef MT6575_OC_FREQ
+        if (get_chip_ver() >= CHIP_6575_E2 && get_chip_ver() < CHIP_6577_E1)
+        {
+            g_limited_freq = DVFS_F1_MT6575_E2;
+        }
+        else
+#endif
         if ((DRV_Reg32(HW_RESV) & (0x1 << 23)) && ((DRV_Reg32(HW_RESV) & (0x1 << 20)) == 0))
         {
             g_limited_freq = DVFS_F1;
@@ -1283,7 +1364,7 @@ static int cpufreq_pdrv_probe(struct platform_device *pdev)
     }
     else if (get_chip_ver() >= CHIP_6575_E2)
     {
-        g_cur_freq = DVFS_F1_MT6575_E2;
+        g_cur_freq = DVFS_F2;
         g_limited_freq = DVFS_F1_MT6575_E2;
         g_limited_min_freq = DVFS_F4_MT6575_E2;
     }
