@@ -147,6 +147,10 @@ int nval_get(const char *xb, int xb_size, const YCHAR * name, char *buf,
 		pos++;
 		size--;
 
+		/* Linux getxattr(NULL, 0) queries the value length. */
+		if (!bsize)
+			return size;
+
 		if (size <= bsize) {
 			memcpy(buf, xb + pos, size);
 			return size;
@@ -165,27 +169,18 @@ int nval_list(const char *xb, int xb_size, char *buf, int bsize)
 	int size;
 	int name_len;
 	int ncopied = 0;
-	int filled = 0;
 
-	memcpy(&size, xb + pos, sizeof(int));
-	while (size > sizeof(int) && size <= xb_size && (pos + size) < xb_size
-	       && !filled) {
+	memcpy(&size, xb, sizeof(int));
+	while (size > sizeof(int) && size <= xb_size && (pos + size) < xb_size) {
 		pos += sizeof(int);
 		size -= sizeof(int);
-		name_len = strnlen((YCHAR *) (xb + pos), size);
-		if (ncopied + name_len + 1 < bsize) {
-			memcpy(buf, xb + pos, name_len * sizeof(YCHAR));
-			buf += name_len;
-			*buf = '\0';
-			buf++;
-			if (sizeof(YCHAR) > 1) {
-				*buf = '\0';
-				buf++;
-			}
-			ncopied += (name_len + 1);
-		} else {
-			filled = 1;
-                }
+		name_len = strnlen((YCHAR *)(xb + pos), size);
+		if (bsize) {
+			if (ncopied + name_len + 1 > bsize)
+				return -ERANGE;
+			memcpy(buf + ncopied, xb + pos, name_len + 1);
+		}
+		ncopied += name_len + 1;
 		pos += size;
 		if (pos < xb_size - sizeof(int))
 			memcpy(&size, xb + pos, sizeof(int));
