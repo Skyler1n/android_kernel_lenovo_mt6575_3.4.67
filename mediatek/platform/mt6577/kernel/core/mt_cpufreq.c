@@ -1019,6 +1019,8 @@ void mtk_cpufreq_late_resume(struct early_suspend *h)
         g_limited_min_freq = DVFS_F8;
 
     cpufreq_state_set(1);
+    /* Non-sampling governors must reapply limits after suspend forced 1 GHz. */
+    cpufreq_update_policy(0);
 
     #endif
 
