@@ -613,10 +613,19 @@ static void mtk_cpufreq_set(unsigned int freq_old, unsigned int freq_new)
 /**************************************
 * check if maximum frequency is needed
 ***************************************/
-static int mtk_cpufreq_keep_max_freq(unsigned int freq_old, unsigned int freq_new)
+static int mtk_cpufreq_keep_max_freq(struct cpufreq_policy *policy,
+                                     unsigned int freq_old, unsigned int freq_new)
 {
     if (mtk_cpufreq_pause)
         return 1;
+
+    /* These governors do not retry a target rejected by the downscale delay. */
+    if (!strcmp(policy->governor->name, "powersave") ||
+        !strcmp(policy->governor->name, "userspace"))
+    {
+        g_ramp_down_count = 0;
+        return 0;
+    }
 
     /* check if system is going to ramp down */
     if (freq_new < freq_old)
@@ -752,7 +761,7 @@ static int mtk_cpufreq_target(struct cpufreq_policy *policy, unsigned int target
     #endif
 
     #ifndef MTK_DVFS_RANDOM_TEST
-    if (mtk_cpufreq_keep_max_freq(freqs.old, freqs.new))
+    if (mtk_cpufreq_keep_max_freq(policy, freqs.old, freqs.new))
     {
         freqs.new = policy->max;
     }
