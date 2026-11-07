@@ -187,8 +187,6 @@ static bool mtk_cpufreq_debug = false;
 static bool mtk_cpufreq_ready = false;
 static bool mtk_cpufreq_pause = false;
 
-static bool cpufreq_usb_limit = true;
-
 /*****************************************
 * Turbo mode threshold
 ******************************************/
@@ -617,13 +615,6 @@ static void mtk_cpufreq_set(unsigned int freq_old, unsigned int freq_new)
 ***************************************/
 static int mtk_cpufreq_keep_max_freq(unsigned int freq_old, unsigned int freq_new)
 {
-    if (cpufreq_usb_limit)
-    {
-        /* if usb connected, keep maximum frequency */
-        if ((DRV_Reg32(UPLL_CON0) & 0x1) == 0)
-            return 1;
-    }
-
     if (mtk_cpufreq_pause)
         return 1;
 
